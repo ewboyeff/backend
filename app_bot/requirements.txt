@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+httpx
+python-dotenv
+pydantic
+email-validator
