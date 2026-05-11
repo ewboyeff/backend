@@ -242,3 +242,19 @@ async def verify_fund(
         message="Fond muvaffaqiyatli tasdiqlandi",
         data=FundDetail.model_validate(fund),
     )
+
+
+@router.post("/{fund_id}/recalculate-index", response_model=DataResponse[FundDetail])
+async def recalculate_fund_index(
+    fund_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.admin)),
+):
+    """Fondning indeks ballarini avtomatik qayta hisoblash."""
+    await auto_calculate_fund_index(fund_id)
+    service = FundService(db)
+    fund = await service.get_by_id(fund_id)
+    return DataResponse(
+        message="Indeks muvaffaqiyatli qayta hisoblandi",
+        data=FundDetail.model_validate(fund),
+    )
