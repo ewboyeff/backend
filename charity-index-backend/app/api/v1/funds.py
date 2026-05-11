@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from app.schemas.fund import (
     FundUpdate,
     ProjectResponse,
 )
+from app.services.auto_index import auto_calculate_fund_index
 from app.services.fund import FundService
 
 
@@ -167,11 +168,13 @@ async def get_fund_reports(
 )
 async def create_fund(
     data: FundCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin)),
 ):
     service = FundService(db)
     fund = await service.create(data)
+    background_tasks.add_task(auto_calculate_fund_index, fund.id)
     return DataResponse(
         message="Fond muvaffaqiyatli qo'shildi",
         data=FundDetail.model_validate(fund),
@@ -182,6 +185,7 @@ async def create_fund(
 async def update_fund(
     fund_id: UUID,
     data: FundUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -208,6 +212,7 @@ async def update_fund(
 
     service = FundService(db)
     fund = await service.update(fund_id, data)
+    background_tasks.add_task(auto_calculate_fund_index, fund.id)
     return DataResponse(
         message="Fond muvaffaqiyatli yangilandi",
         data=FundDetail.model_validate(fund),

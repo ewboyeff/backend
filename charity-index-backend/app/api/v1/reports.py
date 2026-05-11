@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -11,6 +11,7 @@ from app.models.report import FinancialReport
 from app.models.user import UserRole
 from app.schemas.base import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.report import ReportCreate, ReportResponse, ReportUpdate
+from app.services.auto_index import auto_calculate_fund_index
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -57,7 +58,7 @@ async def list_reports(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=DataResponse[ReportResponse], dependencies=_admin)
-async def create_report(data: ReportCreate, db: AsyncSession = Depends(get_db)):
+async def create_report(data: ReportCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     report = FinancialReport(**data.model_dump())
     db.add(report)
     await db.commit()
@@ -66,11 +67,12 @@ async def create_report(data: ReportCreate, db: AsyncSession = Depends(get_db)):
         select(FinancialReport).where(FinancialReport.id == report.id).options(selectinload(FinancialReport.fund))
     )
     report = result.scalar_one()
+    background_tasks.add_task(auto_calculate_fund_index, report.fund_id)
     return DataResponse(message="Hisobot qo'shildi", data=ReportResponse.model_validate(report))
 
 
 @router.put("/{report_id}", response_model=DataResponse[ReportResponse], dependencies=_admin)
-async def update_report(report_id: UUID, data: ReportUpdate, db: AsyncSession = Depends(get_db)):
+async def update_report(report_id: UUID, data: ReportUpdate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(FinancialReport).where(FinancialReport.id == report_id).options(selectinload(FinancialReport.fund))
     )
@@ -82,6 +84,7 @@ async def update_report(report_id: UUID, data: ReportUpdate, db: AsyncSession = 
         setattr(report, field, value)
     await db.commit()
     await db.refresh(report)
+    background_tasks.add_task(auto_calculate_fund_index, report.fund_id)
     return DataResponse(message="Hisobot yangilandi", data=ReportResponse.model_validate(report))
 
 

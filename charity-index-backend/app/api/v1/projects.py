@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.models.project import Project, ProjectStatus
 from app.models.user import UserRole
 from app.schemas.base import DataResponse, PaginatedResponse, PaginationMeta
 from app.schemas.fund import ProjectResponse
+from app.services.auto_index import auto_calculate_fund_index
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -83,7 +84,7 @@ async def list_projects(
     response_model=DataResponse[ProjectResponse],
     dependencies=[Depends(require_role(UserRole.moderator, UserRole.admin))],
 )
-async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db)):
+async def create_project(data: ProjectCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     project = Project(**data.model_dump())
     db.add(project)
     await db.commit()
@@ -91,6 +92,7 @@ async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db)
     # reload with relationships
     result = await db.execute(select(Project).where(Project.id == project.id))
     project = result.scalar_one()
+    background_tasks.add_task(auto_calculate_fund_index, project.fund_id)
     return DataResponse(message="Loyiha qo'shildi", data=ProjectResponse.model_validate(project))
 
 
@@ -99,7 +101,7 @@ async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db)
     response_model=DataResponse[ProjectResponse],
     dependencies=[Depends(require_role(UserRole.moderator, UserRole.admin))],
 )
-async def update_project(project_id: UUID, data: ProjectUpdate, db: AsyncSession = Depends(get_db)):
+async def update_project(project_id: UUID, data: ProjectUpdate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
@@ -110,6 +112,7 @@ async def update_project(project_id: UUID, data: ProjectUpdate, db: AsyncSession
     await db.refresh(project)
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one()
+    background_tasks.add_task(auto_calculate_fund_index, project.fund_id)
     return DataResponse(message="Loyiha yangilandi", data=ProjectResponse.model_validate(project))
 
 
