@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
@@ -65,6 +65,32 @@ def decode_token(token: str) -> dict[str, Any]:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "INVALID_TOKEN", "message": "Token noto'g'ri"},
         )
+
+
+async def get_optional_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> "User | None":
+    from app.repositories.user import UserRepository
+
+    authorization: str = request.headers.get("Authorization", "")
+    if not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = decode_token(token)
+    except HTTPException:
+        return None
+    if payload.get("type") != "access":
+        return None
+    user_id: str | None = payload.get("sub")
+    if not user_id:
+        return None
+    repo = UserRepository(db)
+    user = await repo.get_by_id(UUID(user_id))
+    if not user or not user.is_active:
+        return None
+    return user
 
 
 async def get_current_user(

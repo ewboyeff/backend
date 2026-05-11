@@ -6,7 +6,7 @@ from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, get_optional_current_user, require_role
 from app.models.fund import FundStatus
 from app.models.index import IndexGrade
 from app.models.project import Project
@@ -54,7 +54,10 @@ async def list_funds(
     page: int = Query(1, ge=1, description="Sahifa raqami"),
     per_page: int = Query(20, ge=1, le=100, description="Sahifadagi elementlar soni"),
     db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
+    if not current_user or current_user.role != UserRole.admin:
+        is_verified = True
     service = FundService(db)
     funds, meta = await service.list_funds(
         page=page,
@@ -92,9 +95,15 @@ async def list_funds(
 async def get_fund(
     slug: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
 ):
     service = FundService(db)
     fund = await service.get_by_slug(slug)
+    if not fund.is_verified and (not current_user or current_user.role != UserRole.admin):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "NOT_FOUND", "message": "Fond topilmadi"},
+        )
     return DataResponse(data=FundDetail.model_validate(fund))
 
 
