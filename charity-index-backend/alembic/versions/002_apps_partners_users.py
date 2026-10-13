@@ -1,6 +1,6 @@
 """Add applications, partners tables and user phone/region fields.
 
-Revision ID: 002_add_applications_partners_and_user_fields
+Revision ID: 002_apps_partners_users
 Revises: 001_initial_schema
 Create Date: 2026-10-13
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "002_add_applications_partners_and_user_fields"
+revision: str = "002_apps_partners_users"
 down_revision: Union[str, None] = "001_initial_schema"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
