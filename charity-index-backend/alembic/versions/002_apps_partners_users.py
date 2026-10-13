@@ -1,4 +1,4 @@
-"""Add applications, partners tables and user phone/region fields.
+"""Add applications, partners, donation_url and user phone/region fields.
 
 Revision ID: 002_apps_partners_users
 Revises: 001_initial_schema
@@ -31,7 +31,10 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("phone", sa.String(length=20), nullable=True))
     op.add_column("users", sa.Column("region", sa.String(length=100), nullable=True))
 
-    # 2. Create applications table
+    # 2. Add donation_url to funds table
+    op.add_column("funds", sa.Column("donation_url", sa.String(length=500), nullable=True))
+
+    # 3. Create applications table
     op.create_table(
         "applications",
         *_base_columns(),
@@ -45,7 +48,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    # 3. Create partners table
+    # 4. Create partners table
     op.create_table(
         "partners",
         *_base_columns(),
@@ -61,5 +64,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("partners")
     op.drop_table("applications")
+    op.drop_column("funds", "donation_url")
     op.drop_column("users", "region")
     op.drop_column("users", "phone")
