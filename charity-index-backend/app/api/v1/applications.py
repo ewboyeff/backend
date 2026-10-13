@@ -8,6 +8,7 @@ from app.models.application import Application
 from app.models.user import UserRole
 from app.schemas.application import ApplicationCreate, ApplicationResponse
 from app.schemas.base import DataResponse, PaginatedResponse, PaginationMeta
+from app.services.telegram_notify import notify_admin
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -33,6 +34,23 @@ async def create_application(
     db.add(app)
     await db.commit()
     await db.refresh(app)
+
+    lines = [
+        "📨 <b>Yangi murojaat</b>",
+        "",
+        f"🏷 Turi: {app.type}",
+        f"👤 Ism: {app.full_name}",
+    ]
+    if app.organization:
+        lines.append(f"🏢 Tashkilot: {app.organization}")
+    if app.phone:
+        lines.append(f"📞 Telefon: {app.phone}")
+    if app.email:
+        lines.append(f"📧 Email: {app.email}")
+    lines.append(f"💬 Xabar: {app.message or '—'}")
+
+    await notify_admin("\n".join(lines))
+
     return DataResponse(
         message="Murojaatingiz muvaffaqiyatli yuborildi",
         data=ApplicationResponse.model_validate(app),

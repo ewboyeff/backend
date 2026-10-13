@@ -9,6 +9,7 @@ from app.models.user import User, UserRole
 from app.schemas.base import DataResponse, PaginatedResponse
 from app.schemas.review import ReviewCreate, ReviewResponse
 from app.services.review import ReviewService
+from app.services.telegram_notify import notify_admin
 
 router = APIRouter(prefix="/funds", tags=["Reviews"])
 
@@ -30,6 +31,20 @@ async def create_review(
     """
     service = ReviewService(db)
     review = await service.create(fund_id=fund_id, user_id=current_user.id, data=data)
+
+    stars = "⭐" * review.rating
+    await notify_admin(
+        f"🆕 <b>Yangi sharh</b>\n\n"
+        f"🏦 Fond: <b>{review.fund.name_uz}</b>\n"
+        f"👤 Foydalanuvchi: {review.user.full_name or review.user.email}\n"
+        f"{stars} ({review.rating}/5)\n"
+        f"💬 {review.comment or '—'}",
+        buttons=[[
+            ("✅ Tasdiqlash", f"modreview:approve:{review.id}"),
+            ("❌ O'chirish", f"modreview:reject:{review.id}"),
+        ]],
+    )
+
     return DataResponse(
         message="Sharh muvaffaqiyatli yuborildi",
         data=ReviewResponse.model_validate(review),

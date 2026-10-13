@@ -8,7 +8,13 @@ from app.core.database import get_db
 from app.core.security import get_current_user, hash_password, verify_password
 from app.models.user import User
 from app.schemas.base import DataResponse
-from app.schemas.user import TokenResponse, UserLogin, UserRegister, UserResponse
+from app.schemas.user import (
+    TokenResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+    UserSelfUpdate,
+)
 from app.services.auth import AuthService
 
 limiter = Limiter(key_func=get_remote_address)
@@ -99,6 +105,21 @@ async def me(
     current_user: User = Depends(get_current_user),
 ):
     return DataResponse(data=UserResponse.model_validate(current_user))
+
+
+@router.patch("/me", response_model=DataResponse[UserResponse])
+async def update_me(
+    data: UserSelfUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return DataResponse(message="Profil yangilandi", data=UserResponse.model_validate(current_user))
 
 
 class ChangePasswordRequest(BaseModel):

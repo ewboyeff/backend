@@ -39,6 +39,8 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     full_name: str | None
+    phone: str | None
+    region: str | None
     role: UserRole
     is_active: bool
     created_at: datetime
@@ -54,6 +56,21 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class UserSelfUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+    region: str | None = None
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str | None) -> str | None:
+        if v is not None and len(v.strip()) < 2:
+            raise ValueError(
+                "Ism-familiya kamida 2 ta belgidan iborat bo'lishi kerak"
+            )
+        return v.strip() if v is not None else v
 
 
 # ---------------------------------------------------------------------------
